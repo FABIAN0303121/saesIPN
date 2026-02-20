@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAES Moderno - IPN</title>
+    <style>
+        :root { --ipn-guinda: #6B1C36; --bg-color: #f3f4f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { color: var(--ipn-guinda); text-align: center; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; font-size: 0.9rem; }
+        select, input { width: 100%; padding: 0.8rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        .captcha-box { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+        #captcha-img { background: #eee; min-width: 120px; height: 45px; border-radius: 4px; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd; }
+        .btn { width: 100%; padding: 0.8rem; background: var(--ipn-guinda); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; margin-top: 1.5rem; transition: background 0.3s; }
+        .btn:hover { background: #521228; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        #mensaje { margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <h2>Acceso SAES Unificado</h2>
+
+    <div class="form-group">
+        <label>Selecciona tu Escuela</label>
+        <select id="unidad" onchange="cargarCaptcha()">
+            <option value="">-- Seleccionar --</option>
+            {% for u in unidades %}
+            <option value="{{ u }}">{{ u.upper() }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <form id="loginForm" style="display:none;">
+        <div class="form-group">
+            <label>Boleta</label>
+            <input type="text" id="usuario" required>
+        </div>
+        <div class="form-group">
+            <label>Contraseña</label>
+            <input type="password" id="password" required>
+        </div>
+        <div class="form-group">
+            <label>Código de Seguridad</label>
+            <div class="captcha-box">
+                <img id="captcha-img" src="" alt="Captcha">
+                <input type="text" id="captcha-input" placeholder="Código" required>
+            </div>
+        </div>
+        <button type="submit" class="btn" id="btnIngresar">Ingresar</button>
+    </form>
+
+    <div id="mensaje"></div>
+</div>
+
+<script>
+    async function cargarCaptcha() {
+        const unidad = document.getElementById('unidad').value;
+        if (!unidad) return;
+
+        const msg = document.getElementById('mensaje');
+        const img = document.getElementById('captcha-img');
+        const form = document.getElementById('loginForm');
+
+        msg.style.color = "black";
+        msg.innerText = "Conectando al servidor...";
+        img.src = "";
+
+        const formData = new FormData();
+        formData.append('unidad', unidad);
+
+        try {
+            const response = await fetch('/prepare_login', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (response.ok) {
+                img.src = "data:image/png;base64," + data.captcha_img;
+                form.style.display = 'block';
+                msg.innerText = "Sistema de " + unidad.toUpperCase() + " listo.";
+            } else {
+                msg.style.color = "red";
+                msg.innerText = "Error: " + (data.error || "No se pudo obtener el captcha");
+            }
+        } catch (e) {
+            msg.style.color = "red";
+            msg.innerText = "Error de red: No se pudo contactar con el servidor.";
+        }
+    }
+
+    document.getElementById('loginForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btnIngresar');
+        const msg = document.getElementById('mensaje');
+
+        btn.disabled = true;
+        msg.innerText = "Validando...";
+
+        const formData = new FormData();
+        formData.append('usuario', document.getElementById('usuario').value);
+        formData.append('password', document.getElementById('password').value);
+        formData.append('captcha', document.getElementById('captcha-input').value);
+
+        const response = await fetch('/login', { method: 'POST', body: formData });
+        const result = await response.text();
+
+        if (response.ok) {
+            msg.style.color = "green";
+            msg.innerHTML = "<b>¡ÉXITO!</b> " + result;
+        } else {
+            msg.style.color = "red";
+            msg.innerText = "Error: Usuario o Captcha incorrectos.";
+            cargarCaptcha();
+        }
+        btn.disabled = false;
+    };
+</script>
+
+</body>
+</html>
